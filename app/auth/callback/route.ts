@@ -86,24 +86,7 @@ export async function GET(request: Request) {
             console.error('[AUTH CALLBACK] Error fetching workspace info', workspaceError)
           }
 
-          // Save the integration data to Supabase
-          const { error: dbError } = await supabase.from("integrations").upsert(
-            {
-              user_id: authData.session.user.id,
-              provider: "notion",
-              access_token: notionToken,
-              // We don't have workspace details from the session, so we'll need to fetch them separately
-              // or update this record later when we have that information
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              status: "active",
-            },
-            {
-              onConflict: "user_id,provider",
-            },
-          )
-
-          if (dbError) throw dbError
+          console.log('[AUTH CALLBACK] Successfully authenticated with Notion')
         } catch (integrationError: any) {
           console.error("[AUTH CALLBACK] Integration error:", {
             message: integrationError.message,
