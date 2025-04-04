@@ -91,6 +91,7 @@ export default function AuthPage() {
 
   const handleNotionSignIn = async () => {
     setLoading(true)
+    console.log('[AUTH] Initiating Notion authentication flow', { timestamp: new Date().toISOString() })
 
     try {
       const { error } = await supabase.auth.signInWithOAuth({

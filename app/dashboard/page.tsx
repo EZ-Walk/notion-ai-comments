@@ -22,7 +22,7 @@ export default function DashboardPage() {
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
     supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   })
-  const [integrationData, setIntegrationData] = useState<any>(null)
+  const [notionConnected, setNotionConnected] = useState<boolean>(false)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -37,17 +37,9 @@ export default function DashboardPage() {
 
       setUser(session.user)
 
-      // Fetch integration data
-      const { data: integrationData, error: integrationError } = await supabase
-        .from("integrations")
-        .select("*")
-        .eq("user_id", session.user.id)
-        .eq("provider", "notion")
-        .single()
-
-      if (!integrationError && integrationData) {
-        // Store integration data in state
-        setIntegrationData(integrationData)
+      // Check if user has a Notion connection by looking for provider_token in session
+      if (session.provider_token && session.user.app_metadata?.provider === 'notion') {
+        setNotionConnected(true)
       }
     }
 
@@ -186,12 +178,12 @@ export default function DashboardPage() {
                   <CardDescription>Manage your Notion workspace connection.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {integrationData ? (
+                  {notionConnected ? (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">Connected Workspace</p>
-                          <p className="text-sm text-muted-foreground">{integrationData.workspace_name}</p>
+                          <p className="text-sm text-muted-foreground">Connected to Notion</p>
                         </div>
                         <div className="flex items-center">
                           <span className="mr-2 h-2 w-2 rounded-full bg-green-500"></span>
@@ -202,8 +194,13 @@ export default function DashboardPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          // Implement disconnect functionality
-                          // This would delete the integration record
+                          // Sign out and refresh the page to disconnect from Notion
+                          supabase.auth.signOut();
+                          router.refresh();
+                          toast({
+                            title: "Disconnected",
+                            description: "Your Notion workspace has been disconnected."
+                          })
                         }}
                       >
                         Disconnect
