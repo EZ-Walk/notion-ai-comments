@@ -16,6 +16,8 @@ export default function DashboardPage() {
   const [apiKey, setApiKey] = useState("")
   const [loading, setLoading] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const [tokensConsumed, setTokensConsumed] = useState<number>(0)
+  const [tokenLimit, setTokenLimit] = useState<number>(0)
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClientComponentClient({
@@ -40,6 +42,31 @@ export default function DashboardPage() {
       // Check if user has a Notion connection by looking for provider_token in session
       if (session.provider_token && session.user.app_metadata?.provider === 'notion') {
         setNotionConnected(true)
+      }
+      
+      // Fetch user's subscription data
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .select('tokens_consumed, token_limit')
+        .eq('user_id', session.user.id)
+        .single()
+      
+      if (subscriptionData) {
+        setTokensConsumed(subscriptionData.tokens_consumed || 0)
+        setTokenLimit(subscriptionData.token_limit || 0)
+      } else if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+        // PGRST116 is the error code for "no rows returned" - we don't want to show an error for this
+        console.error('Error fetching subscription data:', subscriptionError)
+      }
+
+      // Fetch the stored API key
+      try {
+        const { data, error } = await supabase.rpc('get_api_key')
+        if (data) {
+          setApiKey(data)
+        }
+      } catch (error) {
+        console.error('Error fetching API key:', error)
       }
     }
 
@@ -282,6 +309,37 @@ export default function DashboardPage() {
                       <Button>Upgrade to Pro</Button>
                     </div>
                   </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Token Usage</Label>
+                    <div className="rounded-md border p-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">Tokens Consumed:</span>
+                          <span className="font-medium">{tokensConsumed.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">Token Limit:</span>
+                          <span className="font-medium">{tokenLimit.toLocaleString()}</span>
+                        </div>
+                        <div className="mt-2">
+                          <div className="h-2 w-full rounded-full bg-muted">
+                            <div 
+                              className="h-2 rounded-full bg-primary" 
+                              style={{ 
+                                width: `${Math.min(100, (tokensConsumed / Math.max(1, tokenLimit)) * 100)}%` 
+                              }}
+                            />
+                          </div>
+                          <p className="mt-2 text-xs text-muted-foreground text-right">
+                            {tokenLimit > 0 
+                              ? `${Math.round((tokensConsumed / tokenLimit) * 100)}% of limit used` 
+                              : 'No limit set'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -295,10 +353,9 @@ export default function DashboardPage() {
             <MessageSquareText className="h-5 w-5" />
             <span>NotionAI Comments</span>
           </div>
-          <p className="text-sm text-gray-500">© {new Date().getFullYear()} NotionAI Comments. All rights reserved.</p>
+          <p className="text-sm text-gray-500"> {new Date().getFullYear()} NotionAI Comments. All rights reserved.</p>
         </div>
       </footer>
     </div>
   )
 }
-
