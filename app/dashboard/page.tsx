@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [tokensConsumed, setTokensConsumed] = useState<number>(0)
   const [tokenLimit, setTokenLimit] = useState<number>(0)
+  const [displayName, setDisplayName] = useState<string>("") 
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClientComponentClient({
@@ -38,6 +39,11 @@ export default function DashboardPage() {
       }
 
       setUser(session.user)
+
+      // Set display name (use email if no name is available)
+      const userEmail = session.user.email || ''
+      const userName = session.user.user_metadata?.full_name || ''
+      setDisplayName(userName || userEmail.split('@')[0])
 
       // Check if user has a Notion connection by looking for provider_token in session
       if (session.provider_token && session.user.app_metadata?.provider === 'notion') {
@@ -143,15 +149,7 @@ export default function DashboardPage() {
                 <div className="space-y-1">
                   <Button variant="ghost" className="w-full justify-start">
                     <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start">
-                    <User className="mr-2 h-4 w-4" />
-                    Account
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start">
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Billing
+                    Dashboard
                   </Button>
                 </div>
               </div>
@@ -161,44 +159,15 @@ export default function DashboardPage() {
 
         <main className="flex w-full flex-col overflow-hidden py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Hello, {displayName}</h1>
           </div>
 
-          <Tabs defaultValue="settings" className="mt-6">
+          <Tabs defaultValue="dashboard" className="mt-6">
             <TabsList>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
-              <TabsTrigger value="account">Account</TabsTrigger>
-              <TabsTrigger value="billing">Billing</TabsTrigger>
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="settings" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>API Settings</CardTitle>
-                  <CardDescription>Add your OpenAI API key to use with NotionAI Comments.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="api-key">OpenAI API Key</Label>
-                    <Input
-                      id="api-key"
-                      type="password"
-                      placeholder="sk-..."
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Your API key is encrypted and securely stored. We never share your API key.
-                    </p>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button onClick={saveApiKey} disabled={loading || !apiKey}>
-                    {loading ? "Saving..." : "Save API Key"}
-                  </Button>
-                </CardFooter>
-              </Card>
-
+            <TabsContent value="dashboard" className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Notion Integration</CardTitle>
@@ -267,33 +236,7 @@ export default function DashboardPage() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="account">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Account Information</CardTitle>
-                  <CardDescription>Manage your account details and preferences.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <div className="rounded-md border px-3 py-2 text-sm">{user.email}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Account Created</Label>
-                    <div className="rounded-md border px-3 py-2 text-sm">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button variant="outline">Update Profile</Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="billing">
               <Card>
                 <CardHeader>
                   <CardTitle>Subscription Plan</CardTitle>
@@ -341,6 +284,33 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>API Settings</CardTitle>
+                  <CardDescription>Add your OpenAI API key to use with NotionAI Comments.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="api-key">OpenAI API Key</Label>
+                    <Input
+                      id="api-key"
+                      type="password"
+                      placeholder="sk-..."
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Your API key is encrypted and securely stored. We never share your API key.
+                    </p>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button onClick={saveApiKey} disabled={loading || !apiKey}>
+                    {loading ? "Saving..." : "Save API Key"}
+                  </Button>
+                </CardFooter>
               </Card>
             </TabsContent>
           </Tabs>
