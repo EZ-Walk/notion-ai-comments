@@ -56,44 +56,20 @@ export async function GET(request: Request) {
           const notionToken = providerData.session?.provider_token
           const notionRefreshToken = providerData.session?.provider_refresh_token
           
+          // Extract the Notion user ID from user_metadata
+          const notionUserId = providerData.session?.user?.user_metadata?.provider_id
+          
           if (!notionToken) {
             throw new Error("Failed to retrieve access token from Notion via Supabase")
           }
           
-          console.log('[AUTH CALLBACK] Successfully retrieved Notion token from Supabase session', {
+          console.log('[AUTH CALLBACK] Successfully retrieved Notion token and user ID', {
             hasToken: !!notionToken,
-            hasRefreshToken: !!notionRefreshToken
+            hasRefreshToken: !!notionRefreshToken,
+            notionUserId
           })
           
-          // Fetch workspace information from Notion API
-          try {
-            const workspaceResponse = await fetch('https://api.notion.com/v1/users/me', {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${notionToken}`,
-                'Notion-Version': '2022-06-28'
-              }
-            })
-            
-            if (!workspaceResponse.ok) {
-              console.error('[AUTH CALLBACK] Failed to fetch workspace info', {
-                status: workspaceResponse.status,
-                statusText: workspaceResponse.statusText
-              })
-            } else {
-              const workspaceData = await workspaceResponse.json()
-              console.log('[AUTH CALLBACK] Fetched workspace info', {
-                name: workspaceData.name,
-                userId: workspaceData.id,
-                type: workspaceData.type,
-                botId: workspaceData.bot?.id
-              })
-            }
-          } catch (workspaceError) {
-            console.error('[AUTH CALLBACK] Error fetching workspace info', workspaceError)
-          }
-          
-          // Initialize or update user subscription with free tier token limit
+          // Store the Notion user ID and initialize/update user subscription
           try {
             const userId = providerData.session?.user?.id
             
@@ -105,41 +81,46 @@ export async function GET(request: Request) {
                 .eq('user_id', userId)
                 .single()
               
-              if (checkError && checkError.code !== 'PGRST116') {
-                // Error other than "no rows returned"
-                console.error('[AUTH CALLBACK] Error checking for existing subscription:', checkError)
-              }
-              
               let upsertError = null
               
               if (!existingSubscription) {
-                // Create new subscription for new users
+                // Create new subscription for new users with Notion user ID
                 const { error } = await supabaseAdmin
                   .from('subscriptions')
                   .insert({
                     user_id: userId,
+                    notion_user_id: notionUserId,  // Include the Notion user ID
                     token_limit: 10000,
                     tokens_consumed: 0,
-                    tier: 'free'
+                    tier: 'free',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
                   })
                 upsertError = error
+                
+                if (error) {
+                  console.error('[AUTH CALLBACK] Error creating subscription with Notion user ID:', error)
+                } else {
+                  console.log('[AUTH CALLBACK] Successfully created subscription with Notion user ID')
+                }
               } else {
-                // Update existing subscription for existing users
+                // Update existing subscription with Notion user ID and token limit
                 const { error } = await supabaseAdmin
                   .from('subscriptions')
                   .update({
+                    notion_user_id: notionUserId,  // Include the Notion user ID
                     token_limit: 10000,
                     tier: 'free',
                     updated_at: new Date().toISOString()
                   })
                   .eq('user_id', userId)
                 upsertError = error
-              }
-              
-              if (upsertError) {
-                console.error('[AUTH CALLBACK] Error updating subscription:', upsertError)
-              } else {
-                console.log('[AUTH CALLBACK] Successfully updated subscription with 10,000 token limit')
+                
+                if (error) {
+                  console.error('[AUTH CALLBACK] Error updating subscription with Notion user ID:', error)
+                } else {
+                  console.log('[AUTH CALLBACK] Successfully updated subscription with Notion user ID')
+                }
               }
             }
           } catch (subscriptionError) {
