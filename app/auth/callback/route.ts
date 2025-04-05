@@ -1,4 +1,5 @@
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
@@ -17,6 +18,12 @@ export async function GET(request: Request) {
 
   const cookieStore = cookies()
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  
+  // Create a service role client for operations that need to bypass RLS
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  )
 
   // Handle OAuth errors
   if (error) {
@@ -84,6 +91,59 @@ export async function GET(request: Request) {
             }
           } catch (workspaceError) {
             console.error('[AUTH CALLBACK] Error fetching workspace info', workspaceError)
+          }
+          
+          // Initialize or update user subscription with free tier token limit
+          try {
+            const userId = providerData.session?.user?.id
+            
+            if (userId) {
+              // First check if the user already has a subscription
+              const { data: existingSubscription, error: checkError } = await supabaseAdmin
+                .from('subscriptions')
+                .select('id')
+                .eq('user_id', userId)
+                .single()
+              
+              if (checkError && checkError.code !== 'PGRST116') {
+                // Error other than "no rows returned"
+                console.error('[AUTH CALLBACK] Error checking for existing subscription:', checkError)
+              }
+              
+              let upsertError = null
+              
+              if (!existingSubscription) {
+                // Create new subscription for new users
+                const { error } = await supabaseAdmin
+                  .from('subscriptions')
+                  .insert({
+                    user_id: userId,
+                    token_limit: 10000,
+                    tokens_consumed: 0,
+                    tier: 'free'
+                  })
+                upsertError = error
+              } else {
+                // Update existing subscription for existing users
+                const { error } = await supabaseAdmin
+                  .from('subscriptions')
+                  .update({
+                    token_limit: 10000,
+                    tier: 'free',
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('user_id', userId)
+                upsertError = error
+              }
+              
+              if (upsertError) {
+                console.error('[AUTH CALLBACK] Error updating subscription:', upsertError)
+              } else {
+                console.log('[AUTH CALLBACK] Successfully updated subscription with 10,000 token limit')
+              }
+            }
+          } catch (subscriptionError) {
+            console.error('[AUTH CALLBACK] Error managing subscription:', subscriptionError)
           }
 
           console.log('[AUTH CALLBACK] Successfully authenticated with Notion')
