@@ -52,6 +52,18 @@ export async function GET(request: Request) {
           
           if (providerError) throw providerError
           
+          // Log the complete user metadata and provider token data from Notion
+          console.log('[AUTH CALLBACK] Complete Notion OAuth response data:', {
+            user_metadata: providerData.session?.user?.user_metadata,
+            provider_token_data: {
+              provider_token: providerData.session?.provider_token ? '[REDACTED]' : undefined,
+              provider_refresh_token: providerData.session?.provider_refresh_token ? '[REDACTED]' : undefined,
+              expires_at: providerData.session?.expires_at,
+              expires_in: providerData.session?.expires_in
+            },
+            raw_app_metadata: providerData.session?.user?.app_metadata
+          })
+          
           // Extract Notion access token and other details from provider token
           const notionToken = providerData.session?.provider_token
           const notionRefreshToken = providerData.session?.provider_refresh_token
@@ -93,6 +105,7 @@ export async function GET(request: Request) {
                     token_limit: 10000,
                     tokens_consumed: 0,
                     tier: 'free',
+                    access_token: notionToken,  // Store the Notion provider token
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                   })
@@ -101,7 +114,10 @@ export async function GET(request: Request) {
                 if (error) {
                   console.error('[AUTH CALLBACK] Error creating subscription with Notion user ID:', error)
                 } else {
-                  console.log('[AUTH CALLBACK] Successfully created subscription with Notion user ID')
+                  console.log('[AUTH CALLBACK] Successfully created subscription with Notion user ID and token', {
+                    hasToken: !!notionToken,
+                    tokenLength: notionToken ? notionToken.length : 0
+                  })
                 }
               } else {
                 // Update existing subscription with Notion user ID and token limit
@@ -111,6 +127,7 @@ export async function GET(request: Request) {
                     notion_user_id: notionUserId,  // Include the Notion user ID
                     token_limit: 10000,
                     tier: 'free',
+                    access_token: notionToken,  // Update the Notion provider token
                     updated_at: new Date().toISOString()
                   })
                   .eq('user_id', userId)
@@ -119,7 +136,10 @@ export async function GET(request: Request) {
                 if (error) {
                   console.error('[AUTH CALLBACK] Error updating subscription with Notion user ID:', error)
                 } else {
-                  console.log('[AUTH CALLBACK] Successfully updated subscription with Notion user ID')
+                  console.log('[AUTH CALLBACK] Successfully updated subscription with Notion user ID and token', {
+                    hasToken: !!notionToken,
+                    tokenLength: notionToken ? notionToken.length : 0
+                  })
                 }
               }
             }
@@ -154,65 +174,5 @@ export async function GET(request: Request) {
   return NextResponse.redirect(new URL("/dashboard", request.url))
 }
 
-// Function to exchange the authorization code for an access token with Notion
-async function exchangeNotionToken(code: string, requestUrl: string) {
-  // Extract origin from the request URL and construct a consistent redirect URI
-  const origin = new URL(requestUrl).origin
-  const redirectUri = `${origin}/auth/callback`
-  const encoded = Buffer.from(`${process.env.NOTION_CLIENT_ID}:${process.env.NOTION_CLIENT_SECRET}`).toString("base64")
-  
-  console.log('[TOKEN EXCHANGE] Attempting to exchange code for token', {
-    timestamp: new Date().toISOString(),
-    codeLength: code,
-    redirectUri,
-    hasClientId: !!process.env.NOTION_CLIENT_ID,
-    hasClientSecret: !!process.env.NOTION_CLIENT_SECRET
-  })
 
-  try {
-    const response = await fetch("https://api.notion.com/v1/oauth/token", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Basic ${encoded}`,
-      },
-      body: JSON.stringify({
-        grant_type: "authorization_code",
-        code: code,
-        redirect_uri: redirectUri,
-      }),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error('[TOKEN EXCHANGE] Failed to exchange token', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData.error,
-        errorDescription: errorData.error_description,
-        fullErrorData: JSON.stringify(errorData),
-        requestBody: JSON.stringify({
-          grant_type: "authorization_code",
-          code: code,
-          redirect_uri: redirectUri,
-        })
-      })
-      throw new Error(errorData.error_description || "Failed to exchange token")
-    }
-    
-    const tokenData = await response.json()
-    console.log('[TOKEN EXCHANGE] Successfully exchanged code for token', {
-      timestamp: new Date().toISOString(),
-      success: true,
-      hasAccessToken: !!tokenData.access_token,
-      workspaceId: tokenData.workspace_id
-    })
-    return tokenData
-
-  } catch (error) {
-    console.error("[TOKEN EXCHANGE] Error during token exchange:", error)
-    throw error
-  }
-}
 
