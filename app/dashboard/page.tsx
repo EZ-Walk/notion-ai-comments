@@ -13,7 +13,6 @@ import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function DashboardPage() {
-  const [apiKey, setApiKey] = useState("")
   const [loading, setLoading] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [tokensConsumed, setTokensConsumed] = useState<number>(0)
@@ -65,15 +64,7 @@ export default function DashboardPage() {
         console.error('Error fetching subscription data:', subscriptionError)
       }
 
-      // Fetch the stored API key
-      try {
-        const { data, error } = await supabase.rpc('get_api_key')
-        if (data) {
-          setApiKey(data)
-        }
-      } catch (error) {
-        console.error('Error fetching API key:', error)
-      }
+
     }
 
     checkUser()
@@ -94,26 +85,7 @@ export default function DashboardPage() {
     router.push("/")
   }
 
-  const saveApiKey = async () => {
-    setLoading(true)
 
-    try {
-      // In a real app, you would securely store this API key
-      // For this example, we'll just show a success message
-      toast({
-        title: "API Key Saved",
-        description: "Your OpenAI API key has been securely saved.",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error saving API key",
-        description: error.message,
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   if (!user) {
     return (
@@ -286,32 +258,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader>
-                  <CardTitle>API Settings</CardTitle>
-                  <CardDescription>Add your OpenAI API key to use with NotionAI Comments.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="api-key">OpenAI API Key</Label>
-                    <Input
-                      id="api-key"
-                      type="password"
-                      placeholder="sk-..."
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Your API key is encrypted and securely stored. We never share your API key.
-                    </p>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button onClick={saveApiKey} disabled={loading || !apiKey}>
-                    {loading ? "Saving..." : "Save API Key"}
-                  </Button>
-                </CardFooter>
-              </Card>
+
             </TabsContent>
           </Tabs>
         </main>
