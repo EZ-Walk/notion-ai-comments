@@ -25,6 +25,8 @@ export default function DashboardPage() {
     supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   })
   const [notionConnected, setNotionConnected] = useState<boolean>(false)
+  const [notionEmail, setNotionEmail] = useState<string>("");
+  const [notionAvatarUrl, setNotionAvatarUrl] = useState<string>("");
 
   useEffect(() => {
     const checkUser = async () => {
@@ -38,6 +40,8 @@ export default function DashboardPage() {
       }
 
       setUser(session.user)
+      
+      console.log("Session after login:", session);
 
       // Set display name (use email if no name is available)
       const userEmail = session.user.email || ''
@@ -46,7 +50,11 @@ export default function DashboardPage() {
 
       // Check if user has a Notion connection by looking for provider_token in session
       if (session.provider_token && session.user.app_metadata?.provider === 'notion') {
-        setNotionConnected(true)
+        setNotionConnected(true);
+        // Extract Notion metadata (adjust keys if needed)
+        const notionMeta = session.user.user_metadata || {};
+        setNotionEmail(notionMeta.email || session.user.email || "");
+        setNotionAvatarUrl(notionMeta.avatar_url || "");
       }
       
       // Fetch user's subscription data
@@ -55,6 +63,8 @@ export default function DashboardPage() {
         .select('tokens_consumed, token_limit')
         .eq('user_id', session.user.id)
         .single()
+      
+      console.log("Subscription fetch result:", { subscriptionData, subscriptionError });
       
       if (subscriptionData) {
         setTokensConsumed(subscriptionData.tokens_consumed || 0)
@@ -147,16 +157,25 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   {notionConnected ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">Connected Workspace</p>
-                          <p className="text-sm text-muted-foreground">Connected to Notion</p>
+                    <div className="space-y-4 flex flex-col items-center">
+                      {notionAvatarUrl ? (
+                        <img
+                          src={notionAvatarUrl}
+                          alt="Profile"
+                          className="w-20 h-20 rounded-full object-cover mx-auto border-2 border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto">
+                          <User className="w-10 h-10 text-gray-400" />
                         </div>
-                        <div className="flex items-center">
-                          <span className="mr-2 h-2 w-2 rounded-full bg-green-500"></span>
-                          <span className="text-sm text-green-600">Active</span>
-                        </div>
+                      )}
+                      <div className="text-center">
+                        <p className="font-medium">{notionEmail}</p>
+                        <p className="text-sm text-muted-foreground">Connected to Notion</p>
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                        <span className="text-sm text-green-600">Active</span>
                       </div>
                       <Button
                         variant="outline"
